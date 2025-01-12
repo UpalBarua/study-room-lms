@@ -1,3 +1,4 @@
+import { Toaster } from "sonner";
 import "@/styles/globals.css";
 
 type RootLayoutProps = {
@@ -7,7 +8,10 @@ type RootLayoutProps = {
 export default function RootLayout({ children }: Readonly<RootLayoutProps>) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        {children}
+        <Toaster position="top-right" richColors />
+      </body>
     </html>
   );
 }
