@@ -1,16 +1,21 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { FormControl, FormField, FormItem } from "@/components/ui/form";
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { CourseSchema } from "@/schemas/course";
 import { Plus, X } from "lucide-react";
 import { Control, useFieldArray } from "react-hook-form";
 import { IconInput } from "./icon-input";
+import type { CourseSchema } from "@/schemas/course";
 
 type DynamicFieldsProps = {
-  name: string;
+  name: keyof CourseSchema;
   control: Control<CourseSchema>;
   label?: string;
   placeholder?: string;
@@ -45,7 +50,7 @@ export function DynamicFields({
                   <IconInput
                     onChange={onChange}
                     value={value}
-                    id={`image-${index}`}
+                    id={`icon-${name}-${index}`}
                   />
                 )}
               />
@@ -58,6 +63,7 @@ export function DynamicFields({
                   <FormControl>
                     <Input placeholder={placeholder} {...field} />
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -81,6 +87,7 @@ export function DynamicFields({
                   <FormControl>
                     <Textarea placeholder={placeholder} {...field} />
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />

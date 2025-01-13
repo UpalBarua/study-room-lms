@@ -14,6 +14,8 @@ export default async function CreateCoursePage() {
   const subcategories = await getSubcategories();
   const instructors = await getInstructors();
 
+  console.log(instructors);
+
   return (
     <section className="mt-6 rounded border bg-background px-6 py-4 shadow-md">
       <h1 className="font-meidum pb-2 text-xl">Create course</h1>

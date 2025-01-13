@@ -44,7 +44,7 @@ export function DepartmentSelect({
             <SelectContent>
               {departments?.map(({ id, name, name_en }) => (
                 <SelectItem className="capitalize" key={id} value={`${id}`}>
-                  {name} ({name_en})
+                  {name} ({name_en}) {id}
                 </SelectItem>
               ))}
             </SelectContent>

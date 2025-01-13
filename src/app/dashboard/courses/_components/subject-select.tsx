@@ -26,7 +26,7 @@ export function SubjectSelect({
 
   const filteredOptions = options.filter(
     (option) =>
-      !value.some((v) => v.id === option.id) &&
+      !value.some((v) => v === option) &&
       option.name_en.toLowerCase().includes(search.toLowerCase()),
   );
 
@@ -41,7 +41,7 @@ export function SubjectSelect({
 
   const handleRemove = useCallback(
     (tagToRemove: Subject) => {
-      onChange(value.filter((tag) => tag.id !== tagToRemove.id));
+      onChange(value.filter((tag) => tag !== tagToRemove));
     },
     [onChange, value],
   );
@@ -66,7 +66,7 @@ export function SubjectSelect({
             key={tag.id}
             className="flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-sm text-primary-foreground"
           >
-            {tag.name}({tag.name_en})
+            {options[tag].name} ({options[tag].name_en})
             <Button
               type="button"
               variant="ghost"
@@ -108,7 +108,7 @@ export function SubjectSelect({
                 className="w-full justify-start font-normal"
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  handleSelect(option);
+                  handleSelect(option.id);
                 }}
               >
                 {option.name} ({option.name_en})

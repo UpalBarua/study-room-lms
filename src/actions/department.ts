@@ -4,12 +4,15 @@ import { Department } from "@/types";
 
 export async function getDepartments(): Promise<Department[]> {
   try {
-    const departments = await fetchFromAPI<Department[]>(`${api}/fetch/class`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${access_token}`,
+    const departments = await fetchFromAPI<Department[]>(
+      `${api}/fetch/department`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
       },
-    });
+    );
 
     return departments;
   } catch (error) {

@@ -33,27 +33,27 @@ const thumbnailSchema = z
     }
   });
 
-const modulesSchema = z.record(
-  z.string(),
+const modulesSchema = z.array(
   z.object({
     title: z.string().nonempty("Module title cannot be empty"),
   }),
 );
 
-const whatsInSchema = z.record(
-  z.string(),
+const pricingSchema = z.object({
+  discount_type: z.enum(["fixed", "percentage"]).default("percentage"),
+  course_fee: z.coerce.number(),
+  discount: z.coerce.number(),
+  is_discount: z.enum(["yes", "no"]).default("yes"),
+});
+
+const whatsInSchema = z.array(
   z.object({
     title: z.string().nonempty("What's In title cannot be empty"),
   }),
 );
 
 const liveCourseDataSchema = z.object({
-  course_duration: z
-    .string()
-    .regex(
-      /^\d{4}-\d{2}-\d{2} to \d{4}-\d{2}-\d{2}$/,
-      "Course duration must be in the format 'YYYY-MM-DD to YYYY-MM-DD'",
-    ),
+  course_duration: z.any().transform((val) => val.length),
   batch_no: z.string().nonempty("Batch number cannot be empty"),
   batch_schedule: z.string().nonempty("Batch schedule cannot be empty"),
   seat_per_batch: z
@@ -61,31 +61,24 @@ const liveCourseDataSchema = z.object({
     .refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
       message: "Seat per batch must be a positive number",
     }),
-  enrollment_deadline: z
-    .string()
-    .regex(
-      /^\d{4}-\d{2}-\d{2}$/,
-      "Enrollment deadline must be in 'YYYY-MM-DD' format",
-    ),
+  enrollment_deadline: z.any().transform((val) => val + ""),
 });
 
-const howCourseLaidOutSchema = z.record(
-  z.string(),
+const howCourseLaidOutSchema = z.array(
   z.object({
     title: z.string().nonempty("Course layout title cannot be empty"),
     description: z.string().optional(),
+    icon: z.instanceof(File).nullable(),
   }),
 );
 
-const courseCurriculumSchema = z.record(
-  z.string(),
+const courseCurriculumSchema = z.array(
   z.object({
     title: z.string().nonempty("Curriculum title cannot be empty"),
   }),
 );
 
-const courseDetailsSchema = z.record(
-  z.string(),
+const courseDetailsSchema = z.array(
   z.object({
     title: z.string().nonempty("Course detail title cannot be empty"),
     description: z
@@ -94,8 +87,7 @@ const courseDetailsSchema = z.record(
   }),
 );
 
-const faqSchema = z.record(
-  z.string(),
+const faqSchema = z.array(
   z.object({
     title: z.string().nonempty("FAQ title cannot be empty"),
     description: z.string().nonempty("FAQ description cannot be empty"),
@@ -116,7 +108,7 @@ export const courseSchema = z.object({
   instructor_id: z.coerce.number(),
   content_type: z.enum(["live", "recorded"]).default("live"),
   purchase_type: z.enum(["paid", "free"]).default("paid"),
-  pricing: z.number().nullable(),
+  pricing: pricingSchema,
   modules: modulesSchema,
   subjects: z.array(z.number()),
   whats_in: whatsInSchema,

@@ -1,9 +1,7 @@
 "use client";
 
-import { Fragment, useEffect } from "react";
-import { useForm } from "react-hook-form";
-
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Form,
   FormControl,
@@ -14,6 +12,11 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -21,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { courseSchema, type CourseSchema } from "@/schemas/course";
 import type {
   Category,
@@ -31,12 +35,45 @@ import type {
   Subject,
 } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { IconCalendar } from "@tabler/icons-react";
+import { addDays, format } from "date-fns";
+import { Fragment, useEffect, useState } from "react";
+import { DateRange } from "react-day-picker";
+import { useForm } from "react-hook-form";
 import { ClassSelect } from "./class-select";
 import { DepartmentSelect } from "./department-select";
 import { DynamicFields } from "./dynamic-fields";
 import { LevelSelect } from "./level-select";
 import { SubjectSelect } from "./subject-select";
 import { UploadThumbnail } from "./upload-thumbnail";
+import { api, access_token } from "@/data/api";
+
+function objectToFormData(
+  obj: Record<string, any>,
+  formData: FormData = new FormData(),
+  parentKey = "",
+): FormData {
+  for (const [key, value] of Object.entries(obj)) {
+    const fullKey = parentKey ? `${parentKey}[${key}]` : key;
+
+    if (value instanceof File || value instanceof Blob) {
+      // Directly append files or blobs
+      formData.append(fullKey, value);
+    } else if (Array.isArray(value)) {
+      // Append arrays by iterating over their items
+      value.forEach((item, index) => {
+        objectToFormData(item, formData, `${fullKey}[${index}]`);
+      });
+    } else if (typeof value === "object" && value !== null) {
+      // Recursively append nested objects
+      objectToFormData(value, formData, fullKey);
+    } else {
+      // Append primitive values
+      formData.append(fullKey, value as string);
+    }
+  }
+  return formData;
+}
 
 type CourseFormProps = {
   departments: Department[];
@@ -71,17 +108,36 @@ export function CourseForm({
     },
   });
 
-  function onSubmit(values: CourseSchema) {
+  async function onSubmit(values: CourseSchema) {
+    const formData = objectToFormData(values);
+
     console.log(values);
+    const response = await fetch(`${api}/admin/course/store`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+    console.log(data);
   }
 
   const courseType = form.watch("course_type");
   const selectedLevel = form.watch("level_id");
   const selectedCourseCategory = form.watch("course_category_id");
+  const courseContentType = form.watch("content_type");
+  const coursePurchaseType = form.watch("purchase_type");
 
   useEffect(() => {
     console.log(form.formState.errors);
   }, [form.formState.errors]);
+
+  const [date, setDate] = useState<DateRange | undefined>({
+    from: new Date(2022, 0, 20),
+    to: addDays(new Date(2022, 0, 20), 20),
+  });
 
   return (
     <Form {...form}>
@@ -220,37 +276,6 @@ export function CourseForm({
                 ({ level_id }) => level_id === selectedLevel,
               )}
             />
-            <FormField
-              control={form.control}
-              name="class_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Class</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={`${field.value}`}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="capitalize">
-                        <SelectValue placeholder="Select a class" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {["academic", "skill"].map((type) => (
-                        <SelectItem
-                          className="capitalize"
-                          key={type}
-                          value={type}
-                        >
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
           </Fragment>
         )}
         <FormField
@@ -305,6 +330,7 @@ export function CourseForm({
           name="faq"
           placeholder="Enter FAQ title"
           label="FAQ"
+          hasDescription
         />
         <FormField
           control={form.control}
@@ -353,7 +379,7 @@ export function CourseForm({
         />
         <FormField
           control={form.control}
-          name="content_type"
+          name="purchase_type"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Purchase Type</FormLabel>
@@ -394,14 +420,14 @@ export function CourseForm({
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {instructors?.map((instructor) => {
+                  {instructors?.map((instructor, i) => {
                     return (
                       <SelectItem
+                        key={i}
                         className="capitalize"
-                        key={instructor?.user?.name}
-                        value={instructor?.user?.name}
+                        value={instructor?.id}
                       >
-                        {instructor?.user?.name}
+                        {instructor?.id}
                       </SelectItem>
                     );
                   })}
@@ -411,6 +437,214 @@ export function CourseForm({
             </FormItem>
           )}
         />
+        {courseContentType === "live" && (
+          <Fragment>
+            <FormField
+              control={form.control}
+              name="live_course_data.batch_no"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Course Batch No.</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Enter batch number"
+                      type="number"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="live_course_data.batch_schedule"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Course Schedule</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter schedule" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="live_course_data.seat_per_batch"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Course Seat</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Enter course title in Bangla"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="live_course_data.enrollment_deadline"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Course Enrollment Deadline</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-[240px] pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground",
+                          )}
+                        >
+                          {field.value ? (
+                            format(field.value, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                          <IconCalendar className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        disabled={(date) =>
+                          date > new Date() || date < new Date("1900-01-01")
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="live_course_data.course_duration"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Course Duration</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="date"
+                        variant={"outline"}
+                        className={cn(
+                          "w-[300px] justify-start text-left font-normal",
+                          !date && "text-muted-foreground",
+                        )}
+                      >
+                        <IconCalendar />
+                        {date?.from ? (
+                          date.to ? (
+                            <>
+                              {format(date.from, "LLL dd, y")} -{" "}
+                              {format(date.to, "LLL dd, y")}
+                            </>
+                          ) : (
+                            format(date.from, "LLL dd, y")
+                          )
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={date?.from}
+                        numberOfMonths={2}
+                        selected={field.value}
+                        onSelect={field.onChange}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </Fragment>
+        )}
+        {coursePurchaseType === "paid" && (
+          <Fragment>
+            <FormField
+              control={form.control}
+              name="pricing.course_fee"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Course Fees</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Enter course fees"
+                      type="number"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="pricing.discount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Discount</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Enter discount"
+                      type="number"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="pricing.discount_type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Course discount type</FormLabel>
+                  <FormControl>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="capitalize">
+                          <SelectValue placeholder="Select a course type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {["fixed", "percentage"].map((type) => (
+                          <SelectItem
+                            className="capitalize"
+                            key={type}
+                            value={type}
+                          >
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </Fragment>
+        )}
         <Button type="submit">Submit</Button>
       </form>
     </Form>
