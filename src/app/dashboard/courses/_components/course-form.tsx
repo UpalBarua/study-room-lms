@@ -48,32 +48,32 @@ import { SubjectSelect } from "./subject-select";
 import { UploadThumbnail } from "./upload-thumbnail";
 import { api, access_token } from "@/data/api";
 
-function objectToFormData(
-  obj: Record<string, any>,
-  formData: FormData = new FormData(),
-  parentKey = "",
-): FormData {
-  for (const [key, value] of Object.entries(obj)) {
-    const fullKey = parentKey ? `${parentKey}[${key}]` : key;
-
-    if (value instanceof File || value instanceof Blob) {
-      // Directly append files or blobs
-      formData.append(fullKey, value);
-    } else if (Array.isArray(value)) {
-      // Append arrays by iterating over their items
-      value.forEach((item, index) => {
-        objectToFormData(item, formData, `${fullKey}[${index}]`);
-      });
-    } else if (typeof value === "object" && value !== null) {
-      // Recursively append nested objects
-      objectToFormData(value, formData, fullKey);
-    } else {
-      // Append primitive values
-      formData.append(fullKey, value as string);
-    }
+const appendToFormData = (formData: FormData, key: string, value: any) => {
+  if (value instanceof File || value instanceof Blob) {
+    formData.append(key, value);
+  } else if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      appendToFormData(formData, `${key}[${index}]`, item);
+    });
+  } else if (typeof value === "object" && value !== null) {
+    Object.entries(value).forEach(([nestedKey, nestedValue]) => {
+      appendToFormData(formData, `${key}[${nestedKey}]`, nestedValue);
+    });
+  } else {
+    formData.append(
+      key,
+      value === null || value === undefined ? "" : value.toString(),
+    );
   }
+};
+
+const objectToFormData = (data: Record<string, any>): FormData => {
+  const formData = new FormData();
+  Object.entries(data).forEach(([key, value]) =>
+    appendToFormData(formData, key, value),
+  );
   return formData;
-}
+};
 
 type CourseFormProps = {
   departments: Department[];
@@ -109,9 +109,16 @@ export function CourseForm({
   });
 
   async function onSubmit(values: CourseSchema) {
-    const formData = objectToFormData(values);
+    const formattedValues = {
+      ...values,
+      live_course_data: {
+        ...values.live_course_data,
+        course_duration: `${values.live_course_data.course_duration?.from} to ${values.live_course_data.course_duration?.to}`,
+      },
+    };
 
-    console.log(values);
+    const formData = objectToFormData(formattedValues);
+
     const response = await fetch(`${api}/admin/course/store`, {
       method: "POST",
       headers: {

@@ -53,7 +53,7 @@ const whatsInSchema = z.array(
 );
 
 const liveCourseDataSchema = z.object({
-  course_duration: z.any().transform((val) => val.length),
+  course_duration: z.any(),
   batch_no: z.string().nonempty("Batch number cannot be empty"),
   batch_schedule: z.string().nonempty("Batch schedule cannot be empty"),
   seat_per_batch: z
