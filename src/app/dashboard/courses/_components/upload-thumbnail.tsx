@@ -73,7 +73,7 @@ export function UploadThumbnail({ form }: Readonly<UploadThumbnailProps>) {
                     defaultValue={`${field.value}`}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-auto">
                         <SelectValue placeholder="Select a department" />
                       </SelectTrigger>
                     </FormControl>
@@ -140,14 +140,14 @@ export function UploadThumbnail({ form }: Readonly<UploadThumbnailProps>) {
                   )}
                 </Fragment>
               ) : (
-                <div className="text-center text-secondary-foreground">
+                <div className="flex flex-col items-center justify-center">
                   {thumbnailType === "image" && (
-                    <IconPhoto className="mx-auto size-16" />
+                    <IconPhoto className="mx-auto size-16 text-muted-foreground" />
                   )}
                   {thumbnailType === "video" && (
-                    <IconMovie className="mx-auto size-16" />
+                    <IconMovie className="mx-auto size-16 text-muted-foreground" />
                   )}
-                  <p className="mt-2 text-sm">
+                  <p className="mt-2 text-sm text-muted-foreground">
                     Drag and drop an image here, or click to select a file
                   </p>
                 </div>

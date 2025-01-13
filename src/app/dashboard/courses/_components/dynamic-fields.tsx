@@ -37,10 +37,10 @@ export function DynamicFields({
   });
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       {label && <label className="block text-sm font-medium">{label}</label>}
       {fields.map((field, index) => (
-        <div key={field.id} className="space-y-2 pb-4">
+        <div key={field.id} className="space-y-2">
           <div className="flex items-center space-x-2">
             {hasIcon && (
               <FormField
