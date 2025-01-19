@@ -9,14 +9,20 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { CourseFormSchema } from "@/schemas/course";
 import { Plus, X } from "lucide-react";
 import { Control, useFieldArray } from "react-hook-form";
 import { IconInput } from "./icon-input";
-import type { CourseSchema } from "@/schemas/course";
+
+type Leaves<T> = T extends object
+  ? {
+      [K in keyof T]: `${Exclude<K, symbol>}${Leaves<T[K]> extends never ? "" : `.${Leaves<T[K]>}`}`;
+    }[keyof T]
+  : never;
 
 type DynamicFieldsProps = {
-  name: keyof CourseSchema;
-  control: Control<CourseSchema>;
+  name: Leaves<CourseFormSchema>;
+  control: Control<CourseFormSchema>;
   label?: string;
   placeholder?: string;
   hasIcon?: boolean;

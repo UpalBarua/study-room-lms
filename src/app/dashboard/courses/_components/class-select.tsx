@@ -12,12 +12,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CourseSchema } from "@/schemas/course";
+import { CourseFormSchema } from "@/schemas/course";
 import type { Class } from "@/types";
 import { Control } from "react-hook-form";
 
 type ClassSelectProps = {
-  control: Control<CourseSchema>;
+  control: Control<CourseFormSchema>;
   classes: Class[];
 };
 

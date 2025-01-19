@@ -6,4 +6,4 @@
 
 export const api = "https://api-studyroomlms.dreamersdesire.com/api";
 export const photos = "https://api-studyroomlms.dreamersdesire.com";
-export const access_token = "DlNb9YihHredr37T9CVwnm2Gi30Tqu74P3k6sEtt7f53f3a9";
+export const access_token = "hgjIGZ7z6CZF5cN9DrwSUIsFUQhkaopak7pu42CY6cf0a6ab";

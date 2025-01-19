@@ -1,126 +1,105 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Subject } from "@/types";
-import { X } from "lucide-react";
-import React, { useCallback, useRef, useState } from "react";
+import type { Control } from "react-hook-form";
 
-interface TagSelectProps {
-  options: Subject[];
-  value: Subject[];
-  onChange: (value: Subject[]) => void;
-  placeholder?: string;
-}
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { CourseFormSchema } from "@/schemas/course";
+import { Subject } from "@/types";
+import { IconX } from "@tabler/icons-react";
+
+type SubjectSelectProps = {
+  control: Control<CourseFormSchema>;
+  subjects: Array<Subject>;
+};
 
 export function SubjectSelect({
-  options,
-  value,
-  onChange,
-  placeholder = "Search or select tags...",
-}: TagSelectProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const filteredOptions = options.filter(
-    (option) =>
-      !value.some((v) => v === option) &&
-      option.name_en.toLowerCase().includes(search.toLowerCase()),
-  );
-
-  const handleSelect = useCallback(
-    (tag: Subject) => {
-      onChange([...value, tag]);
-      setSearch("");
-      inputRef.current?.focus();
-    },
-    [onChange, value],
-  );
-
-  const handleRemove = useCallback(
-    (tagToRemove: Subject) => {
-      onChange(value.filter((tag) => tag !== tagToRemove));
-    },
-    [onChange, value],
-  );
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Backspace" && !search && value.length > 0) {
-        handleRemove(value[value.length - 1]);
-      }
-    },
-    [handleRemove, search, value],
-  );
-
+  control,
+  subjects,
+}: Readonly<SubjectSelectProps>) {
   return (
-    <div className="relative">
-      <div
-        className="flex min-h-[40px] cursor-text flex-wrap items-center gap-2 rounded-md border p-2"
-        onClick={() => inputRef.current?.focus()}
-      >
-        {value.map((tag) => (
-          <span
-            key={tag.id}
-            className="flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-sm text-primary-foreground"
-          >
-            {options[tag].name} ({options[tag].name_en})
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-auto p-0 hover:bg-transparent"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRemove(tag);
-              }}
-            >
-              <X className="h-3 w-3" />
-              <span className="sr-only">Remove {tag.name}</span>
-            </Button>
-          </span>
-        ))}
-        <Input
-          ref={inputRef}
-          type="text"
-          className="flex-1 border-none px-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-          placeholder={value.length === 0 ? placeholder : ""}
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setIsOpen(true);
-          }}
-          onFocus={() => setIsOpen(true)}
-          onBlur={() => setTimeout(() => setIsOpen(false), 200)}
-          onKeyDown={handleKeyDown}
-        />
-      </div>
-      {isOpen && (
-        <ScrollArea className="absolute z-10 mt-1 max-h-[200px] w-full rounded-md border bg-popover text-popover-foreground shadow-md">
-          {filteredOptions.length > 0 ? (
-            filteredOptions.map((option) => (
-              <Button
-                key={option.id}
-                type="button"
-                variant="ghost"
-                className="w-full justify-start font-normal"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  handleSelect(option.id);
-                }}
-              >
-                {option.name} ({option.name_en})
-              </Button>
-            ))
-          ) : (
-            <div className="p-2 text-sm text-muted-foreground">
-              No matching tags found
-            </div>
-          )}
-        </ScrollArea>
+    <FormField
+      control={control}
+      name="subjects"
+      render={({ field }) => (
+        <FormItem className="flex flex-col">
+          <FormLabel>Subjects</FormLabel>
+          <Popover>
+            <PopoverTrigger asChild>
+              <FormControl>
+                <div className="flex min-h-11 w-full flex-wrap gap-2 rounded-md border border-input bg-transparent px-3 py-2 shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
+                  {field.value.map((subject) => (
+                    <span
+                      key={subject}
+                      className="flex items-center gap-2 rounded-md bg-primary/25 px-3 py-2 text-sm text-primary"
+                    >
+                      {
+                        subjects.find(({ name_en }) => name_en === subject)
+                          ?.name
+                      }{" "}
+                      ({subject})
+                      <button
+                        type="button"
+                        className="text-destructive hover:opacity-80"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          field.onChange(
+                            field.value.filter((val) => val !== subject),
+                          );
+                        }}
+                      >
+                        <IconX className="size-4" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </FormControl>
+            </PopoverTrigger>
+            <PopoverContent className="w-full" side="bottom">
+              <Command>
+                <CommandInput placeholder="Search subject..." />
+                <CommandList>
+                  <CommandEmpty>No subjects found.</CommandEmpty>
+                  <CommandGroup>
+                    {subjects
+                      .filter(({ name_en }) => !field.value.includes(name_en))
+                      .map(({ id, name, name_en }) => (
+                        <CommandItem
+                          key={id}
+                          value={`${name_en}`}
+                          onSelect={(val) =>
+                            field.onChange([...field.value, val])
+                          }
+                        >
+                          {name}({name_en})
+                        </CommandItem>
+                      ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+          <FormMessage />
+        </FormItem>
       )}
-    </div>
+    />
   );
 }

@@ -1,3 +1,7 @@
+import { IconMovie, IconPhoto } from "@tabler/icons-react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { UseFormReturn, useWatch } from "react-hook-form";
+
 import {
   FormControl,
   FormField,
@@ -12,46 +16,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { IconMovie, IconPhoto } from "@tabler/icons-react";
-import { Fragment, useEffect, useRef, useState } from "react";
-import { UseFormReturn } from "react-hook-form";
+import type { CourseFormSchema } from "@/schemas/course";
 
 type UploadThumbnailProps = {
-  form: UseFormReturn;
+  form: UseFormReturn<CourseFormSchema>;
 };
 
 export function UploadThumbnail({ form }: Readonly<UploadThumbnailProps>) {
   const [preview, setPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = (file: File) => {
+  const handlePreview = (file: File) => {
     const objectUrl = URL.createObjectURL(file);
     setPreview(objectUrl);
   };
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      form.setValue("icon", e.dataTransfer.files[0]);
-      handleFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const thumbnailType = form.watch("thumbnail.type");
+  const thumbnailType = useWatch({ name: "thumbnail.type" });
 
   useEffect(() => {
-    setPreview(null);
-  }, [thumbnailType]);
+    const file = form.getValues("thumbnail.file");
+    if (file) {
+      handlePreview(file);
+    }
+  }, []);
 
   return (
     <FormField
@@ -69,7 +56,10 @@ export function UploadThumbnail({ form }: Readonly<UploadThumbnailProps>) {
               render={({ field }) => (
                 <FormItem className="min-w-[6rem]">
                   <Select
-                    onValueChange={field.onChange}
+                    onValueChange={(val) => {
+                      setPreview(null);
+                      field.onChange(val);
+                    }}
                     defaultValue={`${field.value}`}
                   >
                     <FormControl>
@@ -91,32 +81,18 @@ export function UploadThumbnail({ form }: Readonly<UploadThumbnailProps>) {
             />
           </FormLabel>
           <FormControl>
-            <div
-              className="cursor-pointer rounded-md border-2 border-dashed p-6"
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-              onClick={handleClick}
-              tabIndex={0}
-              role="button"
-              aria-label="Upload thumbnail"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  handleClick();
-                }
-              }}
-            >
+            <div className="relative rounded-lg border-2 border-dashed p-6">
               <input
                 type="file"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
                     onChange(file);
-                    handleFile(file);
+                    handlePreview(file);
                   }
                 }}
                 accept={`${thumbnailType}/*`}
-                className="hidden"
-                aria-hidden="true"
+                className="absolute inset-0 cursor-pointer opacity-0"
                 {...field}
                 ref={fileInputRef}
               />
@@ -148,7 +124,7 @@ export function UploadThumbnail({ form }: Readonly<UploadThumbnailProps>) {
                     <IconMovie className="mx-auto size-16 text-muted-foreground" />
                   )}
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Drag and drop an image here, or click to select a file
+                    Drag and drop an file here, or click to select a file
                   </p>
                 </div>
               )}

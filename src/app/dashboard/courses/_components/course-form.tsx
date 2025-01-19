@@ -26,78 +26,117 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { access_token, api } from "@/data/api";
-import { cn } from "@/lib/utils";
-import { courseSchema, type CourseSchema } from "@/schemas/course";
+import { cn, generateUniqueKey, objectToFormData } from "@/lib/utils";
+import { courseFormSchema, type CourseFormSchema } from "@/schemas/course";
 import type {
   Category,
   Class,
   Department,
   Instructor,
+  Level,
   Subcategory,
   Subject,
 } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  IconCalendar,
-  IconChevronLeft,
-  IconChevronRight,
-} from "@tabler/icons-react";
-import { addDays, format } from "date-fns";
+import { IconCalendar } from "@tabler/icons-react";
+import { format } from "date-fns";
 import { Fragment, useEffect, useState } from "react";
-import { DateRange } from "react-day-picker";
-import { useForm } from "react-hook-form";
-import { ClassSelect } from "./class-select";
-import { DepartmentSelect } from "./department-select";
+import { useForm, useWatch } from "react-hook-form";
 import { DynamicFields } from "./dynamic-fields";
-import { LevelSelect } from "./level-select";
+import { FormSelect } from "./form-select";
 import { SubjectSelect } from "./subject-select";
 import { UploadThumbnail } from "./upload-thumbnail";
 
-const formSteps = [
-  { value: "basic-details", label: "Basic Details" },
-  { value: "category-and-subjects", label: "Category & Subjects" },
-  { value: "pricing", label: "Pricing" },
-  { value: "modules", label: "Modules" },
-  { value: "course-content", label: "Content" },
-  { value: "course-curriculum", label: "Curriculum" },
-  { value: "course-details", label: "Details" },
-  { value: "faq", label: "FAQ" },
+const courseFormSteps = [
+  {
+    value: "basic-details",
+    label: "Basic Details",
+    description: "Course title and instructor.",
+  },
+  {
+    value: "category-and-subjects",
+    label: "Category & Subjects",
+    description: "Category and subjects.",
+  },
+  { value: "pricing", label: "Pricing", description: "Course price." },
+  { value: "modules", label: "Modules", description: "Course modules." },
+  {
+    value: "course-content",
+    label: "Content",
+    description: "Upload materials.",
+  },
+  {
+    value: "course-curriculum",
+    label: "Curriculum",
+    description: "Topics and lessons.",
+  },
+  {
+    value: "course-details",
+    label: "Details",
+    description: "Prerequisites and outcomes.",
+  },
+  { value: "faq", label: "FAQ", description: "Common questions." },
 ] as const;
 
-const appendToFormData = (formData: FormData, key: string, value: any) => {
-  if (value instanceof File || value instanceof Blob) {
-    formData.append(key, value);
-  } else if (Array.isArray(value)) {
-    value.forEach((item, index) => {
-      appendToFormData(formData, `${key}[${index}]`, item);
-    });
-  } else if (typeof value === "object" && value !== null) {
-    Object.entries(value).forEach(([nestedKey, nestedValue]) => {
-      appendToFormData(formData, `${key}[${nestedKey}]`, nestedValue);
-    });
-  } else {
-    formData.append(
-      key,
-      value === null || value === undefined ? "" : value.toString(),
-    );
-  }
-};
+type CourseFormSteps = (typeof courseFormSteps)[number]["value"];
 
-const objectToFormData = (data: Record<string, any>): FormData => {
-  const formData = new FormData();
-  Object.entries(data).forEach(([key, value]) =>
-    appendToFormData(formData, key, value),
-  );
-  return formData;
+const courseFormDefaultValues: CourseFormSchema = {
+  thumbnail: {
+    type: "image",
+    file: null,
+  },
+  title: "",
+  title_en: "",
+  description: "",
+  course_type: "academic",
+  course_category_id: "",
+  course_subcategory_id: NaN,
+  level_id: NaN,
+  class_id: NaN,
+  department_id: NaN,
+  instructor_id: NaN,
+  content_type: "live",
+  purchase_type: "paid",
+  pricing: {
+    discount_type: "percentage",
+    is_discount: "yes",
+    course_fee: NaN,
+    discount: NaN,
+  },
+  modules: [{ title: "" }],
+  subjects: [""],
+  whats_in: [{ title: "" }],
+  live_course_data: {
+    batch_no: NaN,
+    batch_schedule: "",
+    course_duration: {
+      from: undefined,
+      to: undefined,
+    },
+    enrollment_deadline: new Date(),
+    seat_per_batch: NaN,
+  },
+  how_course_laid_out: [
+    {
+      title: "",
+      description: "",
+      icon: new File([], "empty.jpg", { type: "image/jpeg" }),
+    },
+  ],
+  course_curriculum: [{ title: "" }],
+  course_details: [{ title: "", description: "" }],
+  faq: [{ title: "", description: "" }],
 };
 
 type CourseFormProps = {
-  departments: Department[];
-  classes: Class[];
-  subjects: Subject[];
-  categories: Category[];
-  subcategories: Subcategory[];
-  instructors: Instructor[];
+  departments: Array<Department>;
+  classes: Array<Class>;
+  subjects: Array<Subject>;
+  categories: Array<Category>;
+  subcategories: Array<Subcategory>;
+  instructors: Array<Instructor>;
+  levels: Array<Level>;
+  courseDetails?: CourseFormProps;
 };
 
 export function CourseForm({
@@ -107,34 +146,58 @@ export function CourseForm({
   categories,
   subcategories,
   instructors,
-}: CourseFormProps) {
-  const form = useForm<CourseSchema>({
-    resolver: zodResolver(courseSchema),
-    defaultValues: {
-      thumbnail: {
-        type: "image",
-      },
-      subjects: [],
-      modules: [{ title: "" }],
-      whats_in: [{ title: "" }],
-      course_details: [{ title: "" }],
-      course_layout: [{ title: "" }],
-      course_curriculum: [{ title: "" }],
-      faq: [{ title: "" }],
-    },
+  levels,
+  courseDetails,
+}: Readonly<CourseFormProps>) {
+  const form = useForm<CourseFormSchema>({
+    resolver: zodResolver(courseFormSchema),
+    defaultValues: courseFormDefaultValues,
   });
 
-  async function onSubmit(values: CourseSchema) {
-    const formattedValues = {
+  async function onSubmit(values: CourseFormSchema) {
+    const { instructor_id, ...formattedValues } = {
       ...values,
+      instructors: [values.instructor_id],
       live_course_data: {
         ...values.live_course_data,
-        course_duration: `${values.live_course_data.course_duration?.from} to ${values.live_course_data.course_duration?.to}`,
+        course_duration: `${format(values.live_course_data.course_duration?.from, "yyyy-mm-dd")} to ${format(values.live_course_data.course_duration?.to, "yyyy-mm-dd")}`,
+        enrollment_deadline: format(
+          values.live_course_data.enrollment_deadline,
+          "yyyy-mm-dd",
+        ),
       },
+      modules: Object.fromEntries(
+        values.modules.map((item) => [generateUniqueKey(), { ...item }]),
+      ),
+      whats_in: Object.fromEntries(
+        values.whats_in.map((item) => [generateUniqueKey(), { ...item }]),
+      ),
+      how_course_laid_out: Object.fromEntries(
+        values.how_course_laid_out.map((item) => [
+          generateUniqueKey(),
+          { ...item },
+        ]),
+      ),
+      course_curriculum: Object.fromEntries(
+        values.course_curriculum.map((item) => [
+          generateUniqueKey(),
+          { ...item },
+        ]),
+      ),
+      course_details: Object.fromEntries(
+        values.course_details.map((item) => [generateUniqueKey(), { ...item }]),
+      ),
+      faq: Object.fromEntries(
+        values.faq.map((item) => [generateUniqueKey(), { ...item }]),
+      ),
+      subjects: values.subjects.map(
+        (subject) => subjects.find(({ name_en }) => name_en === subject)?.id,
+      ),
     };
 
-    const formData = objectToFormData(formattedValues);
+    console.log(formattedValues);
 
+    const formData = objectToFormData(formattedValues);
     const response = await fetch(`${api}/admin/course/store`, {
       method: "POST",
       headers: {
@@ -147,48 +210,59 @@ export function CourseForm({
     console.log(data);
   }
 
-  const courseType = form.watch("course_type");
-  const selectedLevel = form.watch("level_id");
-  const selectedCourseCategory = form.watch("course_category_id");
-  const courseContentType = form.watch("content_type");
-  const coursePurchaseType = form.watch("purchase_type");
-
-  useEffect(() => {
-    console.log(form.formState.errors);
-  }, [form.formState.errors]);
-
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: new Date(2022, 0, 20),
-    to: addDays(new Date(2022, 0, 20), 20),
+  const [
+    courseType,
+    selectedLevel,
+    selectedCourseCategory,
+    courseContentType,
+    coursePurchaseType,
+  ] = useWatch({
+    control: form.control,
+    name: [
+      "course_type",
+      "level_id",
+      "course_category_id",
+      "content_type",
+      "purchase_type",
+    ],
   });
 
-  const [formStep, setFormStep] = useState(formSteps[0].value);
+  console.log(form.formState.errors);
+
+  useEffect(() => {
+    form.reset({ ...courseDetails });
+  }, [courseDetails]);
+
+  const [formStep, setFormStep] = useState<CourseFormSteps>(
+    courseFormSteps[0].value,
+  );
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="rounded-2xl border bg-white/90 p-5 shadow"
+      >
         <Tabs
-          defaultValue="basic-details"
-          value={formStep}
           className="flex items-start gap-x-10"
-          onValueChange={setFormStep}
+          defaultValue={courseFormSteps[0].value}
+          value={formStep}
+          onValueChange={(val) => setFormStep(val as CourseFormSteps)}
         >
-          <TabsList className="grid h-full w-max justify-start gap-y-3 bg-background">
-            {formSteps.map(({ label, value }, i) => (
+          <TabsList className="grid h-full w-max justify-start gap-y-2 bg-background">
+            {courseFormSteps.map(({ label, value, description }, i) => (
               <TabsTrigger
-                className="justify-start gap-x-2.5 font-medium !shadow-none"
+                className="group items-center justify-start gap-x-3 rounded-lg py-2 text-start transition-colors duration-300 hover:bg-secondary data-[state=active]:bg-primary/20 data-[state=active]:shadow-sm"
                 key={value}
                 value={value}
               >
-                <span
-                  className={cn(
-                    "flex size-8 items-center justify-center rounded-md bg-secondary text-lg",
-                    value === formStep && "bg-primary text-background",
-                  )}
-                >
+                <span className="flex size-8 items-center justify-center rounded-md bg-secondary text-lg group-data-[state=active]:bg-primary group-data-[state=active]:text-background">
                   {i + 1}
                 </span>
-                {label}
+                <div>
+                  <p className="font-medium text-foreground">{label}</p>
+                  <p className="text-xs">{description}</p>
+                </div>
               </TabsTrigger>
             ))}
           </TabsList>
@@ -285,94 +359,60 @@ export function CourseForm({
                   </FormItem>
                 )}
               />
-              <FormField
+              <FormSelect
                 control={form.control}
                 name="course_category_id"
-                render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Course Category</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={`${field.value}`}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="capitalize">
-                          <SelectValue placeholder="Select a course category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories.map(({ name, name_en, id }) => (
-                          <SelectItem
-                            className="capitalize"
-                            key={id}
-                            value={`${id}`}
-                          >
-                            {name} ({name_en})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                items={categories}
+                label="Course Category"
+                className="col-span-2"
+                renderLabel={(item) => `${item.name} (${item.name_en})`}
               />
-              <FormField
+              <FormSelect
                 control={form.control}
                 name="course_subcategory_id"
-                render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Course Subcategory</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={`${field.value}`}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="capitalize">
-                          <SelectValue placeholder="Select a course subcategory" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {subcategories
-                          .filter(
-                            ({ course_category_id }) =>
-                              course_category_id === selectedCourseCategory,
-                          )
-                          .map(({ name, name_en, id }) => (
-                            <SelectItem
-                              className="capitalize"
-                              key={id}
-                              value={`${id}`}
-                            >
-                              {name} ({name_en})
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                items={subcategories}
+                label="Course Subcategory"
+                className="col-span-2"
+                disabled={!selectedCourseCategory}
+                placeholder={
+                  !selectedCourseCategory
+                    ? "Select a course category first"
+                    : ""
+                }
+                renderLabel={(item) => `${item.name} (${item.name_en})`}
               />
               {courseType === "academic" && (
                 <Fragment>
-                  <div className="col-span-2">
-                    <LevelSelect control={form.control} />
-                  </div>
-                  <div className="col-span-2">
-                    <ClassSelect
-                      control={form.control}
-                      classes={classes.filter(
-                        ({ level_id }) => level_id === selectedLevel,
-                      )}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <DepartmentSelect
-                      departments={departments.filter(
-                        ({ level_id }) => level_id === selectedLevel,
-                      )}
-                      control={form.control}
-                    />
-                  </div>
+                  <FormSelect
+                    control={form.control}
+                    name="level_id"
+                    items={levels}
+                    label="Course Level"
+                    className="col-span-2"
+                    renderLabel={(item) => `${item.name} (${item.name_en})`}
+                  />
+                  <FormSelect
+                    control={form.control}
+                    name="class_id"
+                    items={classes.filter(
+                      ({ level_id }) => level_id === selectedLevel,
+                    )}
+                    label="Class"
+                    className="col-span-2"
+                    disabled={!selectedLevel}
+                    renderLabel={(item) => `${item.name} (${item.name_en})`}
+                  />
+                  <FormSelect
+                    control={form.control}
+                    name="department_id"
+                    items={departments.filter(
+                      ({ level_id }) => level_id === selectedLevel,
+                    )}
+                    label="Department"
+                    className="col-span-2"
+                    disabled={!selectedLevel}
+                    renderLabel={(item) => `${item.name} (${item.name_en})`}
+                  />
                 </Fragment>
               )}
               <FormField
@@ -380,7 +420,7 @@ export function CourseForm({
                 name="instructor_id"
                 render={({ field }) => (
                   <FormItem className="col-span-2">
-                    <FormLabel>Instructor</FormLabel>
+                    <FormLabel>Instructors</FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       defaultValue={`${field.value}`}
@@ -396,9 +436,9 @@ export function CourseForm({
                             <SelectItem
                               key={i}
                               className="capitalize"
-                              value={instructor?.id}
+                              value={`${instructor?.id}`}
                             >
-                              {instructor?.id}
+                              {instructor?.user?.name}
                             </SelectItem>
                           );
                         })}
@@ -408,24 +448,9 @@ export function CourseForm({
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="subjects"
-                render={({ field }) => (
-                  <FormItem className="col-span-4">
-                    <FormLabel>Subjects</FormLabel>
-                    <FormControl>
-                      <SubjectSelect
-                        options={subjects}
-                        placeholder="Search or select technologies..."
-                        value={field.value}
-                        onChange={field.onChange}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="col-span-4">
+                <SubjectSelect control={form.control} subjects={subjects} />
+              </div>
             </TabsContent>
             <TabsContent
               className="grid grid-cols-2 gap-x-8 gap-y-4"
@@ -655,10 +680,7 @@ export function CourseForm({
                               mode="single"
                               selected={field.value}
                               onSelect={field.onChange}
-                              disabled={(date) =>
-                                date > new Date() ||
-                                date < new Date("1900-01-01")
-                              }
+                              disabled={{ before: new Date() }}
                               initialFocus
                             />
                           </PopoverContent>
@@ -680,18 +702,18 @@ export function CourseForm({
                               variant={"outline"}
                               className={cn(
                                 "w-[300px] justify-start text-left font-normal",
-                                !date && "text-muted-foreground",
+                                !field.value && "text-muted-foreground",
                               )}
                             >
                               <IconCalendar />
-                              {date?.from ? (
-                                date.to ? (
+                              {field.value?.from ? (
+                                field.value.to ? (
                                   <>
-                                    {format(date.from, "LLL dd, y")} -{" "}
-                                    {format(date.to, "LLL dd, y")}
+                                    {format(field.value.from, "LLL dd, y")} -{" "}
+                                    {format(field.value.to, "LLL dd, y")}
                                   </>
                                 ) : (
-                                  format(date.from, "LLL dd, y")
+                                  format(field.value.from, "LLL dd, y")
                                 )
                               ) : (
                                 <span>Pick a date</span>
@@ -700,12 +722,11 @@ export function CourseForm({
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0" align="start">
                             <Calendar
-                              initialFocus
                               mode="range"
-                              defaultMonth={date?.from}
-                              numberOfMonths={2}
+                              numberOfMonths={1}
                               selected={field.value}
                               onSelect={field.onChange}
+                              disabled={{ before: new Date() }}
                             />
                           </PopoverContent>
                         </Popover>
@@ -760,15 +781,15 @@ export function CourseForm({
               />
               <Button type="submit">Submit</Button>
             </TabsContent>
-            <div className="flex items-center justify-end gap-x-2 pt-4">
-              <Button variant="secondary">
-                <IconChevronLeft />
-                Previous
-              </Button>
-              <Button variant="secondary">
-                Next <IconChevronRight />
-              </Button>
-            </div>
+            {/* <div className="flex items-center justify-end gap-x-2 pt-4"> */}
+            {/*   <Button variant="secondary"> */}
+            {/*     <IconChevronLeft /> */}
+            {/*     Previous */}
+            {/*   </Button> */}
+            {/*   <Button variant="secondary"> */}
+            {/*     Next <IconChevronRight /> */}
+            {/*   </Button> */}
+            {/* </div> */}
           </div>
         </Tabs>
       </form>

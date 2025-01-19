@@ -4,7 +4,7 @@ import { Department } from "@/types";
 
 export async function getDepartments(): Promise<Department[]> {
   try {
-    const departments = await fetchFromAPI<Department[]>(
+    const departmentsResponse = await fetchFromAPI<Department[]>(
       `${api}/fetch/department`,
       {
         method: "POST",
@@ -14,9 +14,22 @@ export async function getDepartments(): Promise<Department[]> {
       },
     );
 
-    return departments;
+    if (departmentsResponse.status === "success" && departmentsResponse.data) {
+      return departmentsResponse.data;
+    } else {
+      console.warn(
+        "Unexpected response while fetching departments:",
+        departmentsResponse.message,
+      );
+      return [];
+    }
   } catch (error) {
-    console.error("Failed to fetch departments:", error);
-    throw error;
+    if (error instanceof Error) {
+      console.error(`APIError while fetching departments: ${error.message}`);
+    } else {
+      console.error("Unexpected error while fetching departments:", error);
+    }
+
+    return [];
   }
 }

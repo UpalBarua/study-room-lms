@@ -1,104 +1,165 @@
 import { z } from "zod";
 
+import { descriptionSchema, imageFileSchema, titleSchema } from ".";
+
 const thumbnailSchema = z
   .object({
     type: z.enum(["image", "video"]).default("image"),
-    file: z.instanceof(File).nullable(),
+    file: z.instanceof(File, { message: "Thumbnail must be a valid file" }),
   })
   .superRefine((data, ctx) => {
     const { type, file } = data;
 
-    if (type === "image") {
-      if (
-        file &&
-        !["image/png", "image/jpeg", "image/jpg"].includes(file.type)
-      ) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["file"],
-          message: "File must be a valid image (png, jpeg, jpg)",
-        });
-      }
-    } else if (type === "video") {
-      if (
-        file &&
-        !["video/mp4", "video/avi", "video/mkv"].includes(file.type)
-      ) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["file"],
-          message: "File must be a valid video (mp4, avi, mkv)",
-        });
-      }
+    if (file && file.size > 10 * 1024 * 1024) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["file"],
+        message: "File size must be less than or equal to 10 MB",
+      });
+    }
+
+    if (type === "image" && file && !file.type.startsWith("image/")) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["file"],
+        message: "File must be a valid image",
+      });
+    }
+
+    if (type === "video" && file && !file.type.startsWith("video/")) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["file"],
+        message: "File must be a valid video",
+      });
     }
   });
 
 const modulesSchema = z.array(
   z.object({
-    title: z.string().nonempty("Module title cannot be empty"),
+    title: titleSchema,
   }),
 );
-
-const pricingSchema = z.object({
-  discount_type: z.enum(["fixed", "percentage"]).default("percentage"),
-  course_fee: z.coerce.number(),
-  discount: z.coerce.number(),
-  is_discount: z.enum(["yes", "no"]).default("yes"),
-});
 
 const whatsInSchema = z.array(
   z.object({
-    title: z.string().nonempty("What's In title cannot be empty"),
-  }),
-);
-
-const liveCourseDataSchema = z.object({
-  course_duration: z.any(),
-  batch_no: z.string().nonempty("Batch number cannot be empty"),
-  batch_schedule: z.string().nonempty("Batch schedule cannot be empty"),
-  seat_per_batch: z
-    .string()
-    .refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
-      message: "Seat per batch must be a positive number",
-    }),
-  enrollment_deadline: z.any().transform((val) => val + ""),
-});
-
-const howCourseLaidOutSchema = z.array(
-  z.object({
-    title: z.string().nonempty("Course layout title cannot be empty"),
-    description: z.string().optional(),
-    icon: z.instanceof(File).nullable(),
+    title: titleSchema,
   }),
 );
 
 const courseCurriculumSchema = z.array(
   z.object({
-    title: z.string().nonempty("Curriculum title cannot be empty"),
+    title: titleSchema,
+  }),
+);
+
+const howCourseLaidOutSchema = z.array(
+  z.object({
+    title: titleSchema,
+    description: descriptionSchema,
+    icon: imageFileSchema,
   }),
 );
 
 const courseDetailsSchema = z.array(
   z.object({
-    title: z.string().nonempty("Course detail title cannot be empty"),
-    description: z
-      .string()
-      .nonempty("Course detail description cannot be empty"),
+    title: titleSchema,
+    description: descriptionSchema,
   }),
 );
 
 const faqSchema = z.array(
   z.object({
-    title: z.string().nonempty("FAQ title cannot be empty"),
-    description: z.string().nonempty("FAQ description cannot be empty"),
+    title: titleSchema,
+    description: descriptionSchema,
   }),
 );
 
-export const courseSchema = z.object({
+export const liveCourseDataSchema = z
+  .object({
+    course_duration: z.object({
+      from: z.date(),
+      to: z.date(),
+    }),
+    batch_no: z.coerce.number().refine((val) => val > 0, {
+      message: "Batch number must be a positive number",
+    }),
+    batch_schedule: z
+      .string()
+      .trim()
+      .min(1, "Batch schedule cannot be empty")
+      .max(255, "Batch schedule must be at most 255 characters")
+      .regex(/\S/, "Batch schedule cannot be just whitespace"),
+    seat_per_batch: z.coerce.number().refine((val) => val > 0, {
+      message: "Seat per batch must be a positive number",
+    }),
+    enrollment_deadline: z.date(),
+  })
+  .superRefine((data, ctx: z.RefinementCtx) => {
+    if (data.course_duration.from < new Date()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Start date cannot be in the past",
+        path: ["course_duration", "from"],
+      });
+    }
+    if (data.course_duration.to < data.course_duration.from) {
+      ctx.addIssue({
+        code: "custom",
+        message: "End date must be after the start date",
+        path: ["course_duration", "to"],
+      });
+    }
+    if (data.enrollment_deadline < new Date()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Enrollment deadline cannot be in the past",
+        path: ["enrollment_deadline"],
+      });
+    }
+  });
+
+export const pricingSchema = z
+  .object({
+    discount_type: z.enum(["fixed", "percentage"]).default("percentage"),
+    is_discount: z.enum(["yes", "no"]).default("yes"),
+    course_fee: z.coerce
+      .number()
+      .refine((val) => val >= 0, {
+        message: "Course fee must be a positive number",
+      })
+      .refine((val) => !isNaN(val), {
+        message: "Course fee must be a valid number",
+      }),
+    discount: z.coerce
+      .number()
+      .refine((val) => val >= 0, {
+        message: "Discount must be a positive number",
+      })
+      .refine((val) => !isNaN(val), {
+        message: "Discount must be a valid number",
+      }),
+  })
+  .superRefine((data, ctx) => {
+    const { course_fee, discount } = data;
+    if (discount > course_fee) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["discount"],
+        message: "Discount cannot be greater than the course fee",
+      });
+    }
+  });
+
+export const courseFormSchema = z.object({
   thumbnail: thumbnailSchema,
-  title: z.string().nonempty("Title cannot be empty"),
-  title_en: z.string().nonempty("English title cannot be empty"),
-  description: z.string().nonempty("Description cannot be empty"),
+  title: titleSchema,
+  title_en: titleSchema,
+  description: z
+    .string()
+    .trim()
+    .min(1, "Description cannot be empty")
+    .regex(/\S/, "Description cannot be just whitespace"),
   course_type: z.enum(["academic", "skill"]).default("academic"),
   course_category_id: z.coerce.number(),
   course_subcategory_id: z.coerce.number(),
@@ -110,14 +171,13 @@ export const courseSchema = z.object({
   purchase_type: z.enum(["paid", "free"]).default("paid"),
   pricing: pricingSchema,
   modules: modulesSchema,
-  subjects: z.array(z.number()),
+  subjects: z.array(z.string()).nonempty("Subjects are required"),
   whats_in: whatsInSchema,
   live_course_data: liveCourseDataSchema,
-  recorded_course_data: z.any().nullable(),
   how_course_laid_out: howCourseLaidOutSchema,
   course_curriculum: courseCurriculumSchema,
   course_details: courseDetailsSchema,
   faq: faqSchema,
 });
 
-export type CourseSchema = z.infer<typeof courseSchema>;
+export type CourseFormSchema = z.infer<typeof courseFormSchema>;
