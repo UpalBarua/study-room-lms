@@ -39,6 +39,7 @@ export const lectureFormSchema = z.object({
     .string()
     .nonempty("Course ID is required")
     .regex(/^\d+$/, "Course ID must be a numeric string"),
+  module: z.string().nonempty(),
   video_bn: z.string().nonempty(),
   video_en: z.string().nonempty(),
   note_bn: z.string().nonempty(),

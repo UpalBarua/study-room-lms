@@ -3,7 +3,7 @@
 import { LectureFormSchema, lectureFormSchema } from "@/schemas/lecture";
 import type { Chapter, Course, Subject } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, Fragment } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -17,25 +17,20 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { FormSelect } from "../../courses/_components/form-select";
-import { UploadVideo } from "./upload-video";
-import { UploadNote } from "./upload-note";
 import { cn } from "@/lib/utils";
+import { FormSelect } from "../../courses/_components/form-select";
+import { UploadNote } from "./upload-note";
+import { UploadVideo } from "./upload-video";
 
-const lectureType = [
-  {
-    id: "video",
-    label: "Video",
-  },
-  {
-    id: "note",
-    label: "Note",
-  },
-  {
-    id: "quiz",
-    label: "Quiz",
-  },
-];
+type InputObject = Record<string, { title: string }>;
+type OutputObject = { id: string; name: string }[];
+
+function transformToArray(input: InputObject): OutputObject {
+  return Object.entries(input).map(([id, { title }]) => ({
+    id,
+    title,
+  }));
+}
 
 const formSteps = [
   {
@@ -44,7 +39,6 @@ const formSteps = [
   },
   {
     label: "Course & Module",
-
     step: 2,
   },
   {
@@ -81,6 +75,12 @@ export function LectureForm({
     formSteps[0].step,
   );
 
+  const [courseSubjects, setCourseSubjects] = useState<Array<Subject> | null>(
+    null,
+  );
+
+  const [courseModules, setCourseModules] = useState(null);
+
   const form = useForm<LectureFormSchema>({
     resolver: zodResolver(lectureFormSchema),
     defaultValues: lectureFormDefaultValues,
@@ -95,9 +95,27 @@ export function LectureForm({
     console.log(values);
   }
 
-  const selectedCourseSubjects = courses.find(
-    ({ id }) => id.toLocaleString() === selectedCourseId,
-  )?.subjects;
+  useEffect(() => {
+    const selectedCourse = courses.find(
+      ({ id }) => id.toLocaleString() === selectedCourseId,
+    );
+
+    if (selectedCourse) {
+      const selectedCourseSubjectIds = JSON.parse(selectedCourse?.subjects);
+
+      const selectedCourseModules = JSON.parse(selectedCourse?.modules);
+      const selectedCourseModulesArray = transformToArray(
+        selectedCourseModules,
+      );
+
+      const selectedCourseSubjects = subjects.filter(({ id }) =>
+        selectedCourseSubjectIds.includes(id.toLocaleString()),
+      );
+
+      setCourseModules(selectedCourseModulesArray);
+      setCourseSubjects(selectedCourseSubjects);
+    }
+  }, [selectedCourseId]);
 
   return (
     <div className="gap-6 rounded-2xl border bg-white/90 p-5 shadow">
@@ -194,9 +212,7 @@ export function LectureForm({
               <FormSelect
                 control={form.control}
                 name="subject_id"
-                items={subjects.filter(({ id }) =>
-                  selectedCourseSubjects?.includes(id.toLocaleString()),
-                )}
+                items={courseSubjects}
                 label="Subject"
                 renderLabel={(item) => `${item.name} (${item.name_en})`}
               />
@@ -209,7 +225,13 @@ export function LectureForm({
                 label="Chapter"
                 renderLabel={(item) => `${item.name} (${item.name_en})`}
               />
-              {/* MODULE */}
+              <FormSelect
+                control={form.control}
+                name="module"
+                items={courseModules}
+                label="Module"
+                renderLabel={(item) => `${item.title}`}
+              />
             </Fragment>
           )}
           {currentFormStep === 3 && (
